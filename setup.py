@@ -37,7 +37,7 @@ setup(
         ],
 
     packages=['psshlib'],
-    scripts = [os.path.join("bin", p) for p in ["pssh", "pnuke", "prsync", "pslurp", "pscp", "pssh-askpass"]],
+    scripts = [os.path.join("bin", p) for p in ["pssh", "pnuke", "prsync", "pslurp", "pscp", "pssh-askpass", "padb"]],
     data_files=[('man/man1', ['man/man1/pssh.1', 'man/man1/pscp.1',
         'man/man1/prsync.1', 'man/man1/pslurp.1', 'man/man1/pnuke.1'])],
     )
