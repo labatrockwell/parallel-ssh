@@ -71,7 +71,10 @@ def do_padb(hosts, cmdline, opts):
         stdin = None
     manager = Manager(opts)
     for host, port, user in hosts:
-        cmd = ['adb', '-s', host]
+        device = host
+        if port:
+            device = '%s:%s' % (host, port)
+        cmd = ['adb', '-s', device]
         if opts.extra:
             cmd.extend(opts.extra)
         if cmdline:
