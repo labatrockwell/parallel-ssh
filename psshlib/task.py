@@ -12,6 +12,7 @@ from psshlib import askpass_client
 from psshlib import color
 
 BUFFER_SIZE = 1 << 16
+ANNOTATE_LINES = True
 
 try:
     bytes
@@ -192,9 +193,12 @@ class Task(object):
                 if self.outfile:
                     self.writer.write(self.outfile, buf)
                 if self.print_out:
-                    sys.stdout.write('%s: %s' % (self.host, buf))
-                    if buf[-1] != '\n':
-                        sys.stdout.write('\n')
+                    if ANNOTATE_LINES:
+                        self.print_annotated_lines(buf)
+                    else:
+                        sys.stdout.write('%s: %s' % (self.host, buf))
+                        if buf[-1] != '\n':
+                            sys.stdout.write('\n')
             else:
                 self.close_stdout(iomap)
         except (OSError, IOError):
@@ -221,6 +225,8 @@ class Task(object):
                     self.errorbuffer += buf
                 if self.errfile:
                     self.writer.write(self.errfile, buf)
+                if self.print_out:
+                    self.print_annotated_lines(buf, atype='err')
             else:
                 self.close_stderr(iomap)
         except (OSError, IOError):
@@ -237,6 +243,34 @@ class Task(object):
         if self.errfile:
             self.writer.close(self.errfile)
             self.errfile = None
+
+    def print_annotated_lines(self, buf, atype='out'):
+        lines_are_unfinished = (buf[-1] != '\n')
+        lines = buf.splitlines()  ## .split('\n')
+        outs = []
+        formats = {
+            'err': '%(host)s ' + color.B(color.r('=>')) + ' %(line)s',
+            'out': '%(host)s ' + color.b(color.g('->')) + ' %(line)s',
+            '': '%(host)s ' + color.B(color.b('->')) + ' %(line)s',
+            #'eco': '%(host)s =: %(line)s',  # exit code OK
+            #'ece': '%(host)s =: %(line)s',  # exit code error
+        }
+        sformat = formats.get(atype) or formats['']
+        for i, line in enumerate(lines):
+            outline = sformat % dict(line=line, host=self.host)
+            if i == len(lines) - 1:  ## last line
+                if lines_are_unfinished:
+                    ## Sort-of-disambiguate
+                    outline = outline + color.b(color.y('\\'))
+            outs.append(outline)
+        out = '\n'.join(outs) + '\n'
+        if atype == 'err':
+            outbuf = sys.stderr
+        else:
+            outbuf = sys.stdout
+        outbuf.write(out)
+        outbuf.flush()
+        return out
 
     def log_exception(self, e):
         """Saves a record of the most recent exception for error reporting."""
