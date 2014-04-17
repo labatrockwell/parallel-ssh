@@ -1,8 +1,21 @@
-from distutils.core import setup
+#!/usr/bin/env python
+# coding: utf8
+
+try:
+    from setuptools import setup
+except ImportError:
+    from distutils.core import setup
+
 import os
 from psshlib import version
 
-long_description = """PSSH (Parallel SSH) provides parallel versions of OpenSSH and related tools, including pssh, pscp, prsync, pnuke, and pslurp.  The project includes psshlib which can be used within custom applications."""
+long_description = (
+    "PSSH (Parallel SSH) provides parallel versions of OpenSSH and"
+    " related tools, including pssh, pscp, prsync, pnuke, and pslurp."
+    " The project includes psshlib which can be used within custom"
+    " applications."
+)
+
 
 setup(
     name = "pssh",
