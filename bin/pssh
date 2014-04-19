@@ -42,6 +42,9 @@ def option_parser():
             help='read from standard input and send as input to ssh')
     parser.add_option('-P', '--print', dest='print_out', action='store_true',
             help='print output as we get it')
+    parser.add_option('--no-annotate-each-line',
+            dest='no_annotate_lines', action='store_true',
+            help="Don't prefix each line of the `-P`rinted output with the host info")
 
     return parser
 

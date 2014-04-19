@@ -12,7 +12,7 @@ from psshlib import askpass_client
 from psshlib import color
 
 BUFFER_SIZE = 1 << 16
-ANNOTATE_LINES = True
+
 
 try:
     bytes
@@ -65,6 +65,10 @@ class Task(object):
             self.inline = bool(opts.inline)
         except AttributeError:
             self.inline = False
+        try:
+            self.annotate_lines = not bool(opts.no_annotate_lines)
+        except AttributeError:
+            self.annotate_lines = True
         try:
             self.inline_stdout = bool(opts.inline_stdout)
         except AttributeError:
@@ -193,7 +197,7 @@ class Task(object):
                 if self.outfile:
                     self.writer.write(self.outfile, buf)
                 if self.print_out:
-                    if ANNOTATE_LINES:
+                    if self.annotate_lines:
                         self.print_annotated_lines(buf)
                     else:
                         sys.stdout.write('%s: %s' % (self.host, buf))
@@ -226,7 +230,8 @@ class Task(object):
                 if self.errfile:
                     self.writer.write(self.errfile, buf)
                 if self.print_out:
-                    self.print_annotated_lines(buf, atype='err')
+                    if self.annotate_lines:
+                        self.print_annotated_lines(buf, atype='err')
             else:
                 self.close_stderr(iomap)
         except (OSError, IOError):
