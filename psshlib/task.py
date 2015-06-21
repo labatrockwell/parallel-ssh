@@ -47,6 +47,7 @@ class Task(object):
         self.inputbuffer = stdin
         self.byteswritten = 0
         self.outputbuffer = bytes()
+        self.fd_to_buffer = {}
         self.errorbuffer = bytes()
 
         self.stdin = None
@@ -69,6 +70,10 @@ class Task(object):
             self.annotate_lines = not bool(opts.no_annotate_lines)
         except AttributeError:
             self.annotate_lines = True
+        try:
+            self.buffer_lines = not bool(opts.no_buffer_lines)
+        except AttributeError:
+            self.buffer_lines = True
         try:
             self.inline_stdout = bool(opts.inline_stdout)
         except AttributeError:
@@ -199,6 +204,7 @@ class Task(object):
                 if self.print_out:
                     if self.annotate_lines:
                         self.print_annotated_lines(buf)
+                        self.print_annotated_lines(buf, fd=fd)
                     else:
                         sys.stdout.write('%s: %s' % (self.host, buf))
                         if buf[-1] != '\n':
@@ -249,23 +255,38 @@ class Task(object):
             self.writer.close(self.errfile)
             self.errfile = None
 
-    def print_annotated_lines(self, buf, atype='out'):
+    def print_annotated_lines(self, buf, atype='out', fd=None):
         lines_are_unfinished = (buf[-1] != '\n')
-        lines = buf.splitlines()  ## .split('\n')
+        if fd is not None:
+            buf_pre = self.fd_to_buffer.get(fd, bytes())
+            self.fd_to_buffer[fd] = bytes()
+            if buf_pre:
+                buf = buf_pre + buf
+
+        lines = buf.splitlines()  # .split('\n')
+
+        if lines_are_unfinished and self.buffer_lines:
+            self.fd_to_buffer[fd] = lines[-1]
+            lines = lines[:-1]
+            lines_are_unfinished = False
+
+        if not lines:
+            return ''
+
         outs = []
         formats = {
             'err': '%(host)s ' + color.B(color.r('=>')) + ' %(line)s',
             'out': '%(host)s ' + color.b(color.g('->')) + ' %(line)s',
             '': '%(host)s ' + color.B(color.b('->')) + ' %(line)s',
-            #'eco': '%(host)s =: %(line)s',  # exit code OK
-            #'ece': '%(host)s =: %(line)s',  # exit code error
+            # 'eco': '%(host)s =: %(line)s',  # exit code OK
+            # 'ece': '%(host)s =: %(line)s',  # exit code error
         }
         sformat = formats.get(atype) or formats['']
         for i, line in enumerate(lines):
             outline = sformat % dict(line=line, host=self.host)
-            if i == len(lines) - 1:  ## last line
+            if i == len(lines) - 1:  # last line
                 if lines_are_unfinished:
-                    ## Sort-of-disambiguate
+                    # Sort-of-disambiguate
                     outline = outline + color.b(color.y('\\'))
             outs.append(outline)
         out = '\n'.join(outs) + '\n'
@@ -282,7 +303,7 @@ class Task(object):
         if self.verbose:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             exc = ("Exception: %s, %s, %s" %
-                    (exc_type, exc_value, traceback.format_tb(exc_traceback)))
+                   (exc_type, exc_value, traceback.format_tb(exc_traceback)))
         else:
             exc = str(e)
         self.failures.append(exc)

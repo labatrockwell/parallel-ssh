@@ -45,6 +45,9 @@ def option_parser():
     parser.add_option('--no-annotate-each-line',
             dest='no_annotate_lines', action='store_true',
             help="Don't prefix each line of the `-P`rinted output with the host info")
+    parser.add_option('--no-buffer-each-line',
+            dest='no_buffer_lines', action='store_true',
+            help="Don't use line-buffering i.e. allow breaking the lines")
 
     return parser
 
