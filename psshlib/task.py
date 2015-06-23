@@ -203,7 +203,6 @@ class Task(object):
                     self.writer.write(self.outfile, buf)
                 if self.print_out:
                     if self.annotate_lines:
-                        self.print_annotated_lines(buf)
                         self.print_annotated_lines(buf, fd=fd)
                     else:
                         sys.stdout.write('%s: %s' % (self.host, buf))
@@ -237,7 +236,7 @@ class Task(object):
                     self.writer.write(self.errfile, buf)
                 if self.print_out:
                     if self.annotate_lines:
-                        self.print_annotated_lines(buf, atype='err')
+                        self.print_annotated_lines(buf, fd=fd, atype='err')
             else:
                 self.close_stderr(iomap)
         except (OSError, IOError):
@@ -265,7 +264,7 @@ class Task(object):
 
         lines = buf.splitlines()  # .split('\n')
 
-        if lines_are_unfinished and self.buffer_lines:
+        if fd is not None and lines_are_unfinished and self.buffer_lines:
             self.fd_to_buffer[fd] = lines[-1]
             lines = lines[:-1]
             lines_are_unfinished = False
