@@ -209,6 +209,9 @@ class Task(object):
                         if buf[-1] != '\n':
                             sys.stdout.write('\n')
             else:
+                if self.annotate_lines:
+                    # Flush the remaining buffer
+                    self.print_annotated_lines('', fd=fd, force_finish=True)
                 self.close_stdout(iomap)
         except (OSError, IOError):
             _, e, _ = sys.exc_info()
@@ -238,6 +241,9 @@ class Task(object):
                     if self.annotate_lines:
                         self.print_annotated_lines(buf, fd=fd, atype='err')
             else:
+                if self.annotate_lines:
+                    # Flush the remaining buffer
+                    self.print_annotated_lines('', fd=fd, atype='err', force_finish=True)
                 self.close_stderr(iomap)
         except (OSError, IOError):
             _, e, _ = sys.exc_info()
@@ -254,18 +260,20 @@ class Task(object):
             self.writer.close(self.errfile)
             self.errfile = None
 
-    def print_annotated_lines(self, buf, atype='out', fd=None):
-        lines_are_unfinished = (buf[-1] != '\n')
+    def print_annotated_lines(self, buf, atype='out', fd=None, force_finish=False):
         if fd is not None:
-            buf_pre = self.fd_to_buffer.get(fd, bytes())
-            self.fd_to_buffer[fd] = bytes()
+            buf_pre = self.fd_to_buffer.get((fd, atype), bytes())
+            self.fd_to_buffer[(fd, atype)] = bytes()
             if buf_pre:
                 buf = buf_pre + buf
 
+        lines_are_unfinished = buf and (buf[-1] != '\n')
         lines = buf.splitlines()  # .split('\n')
 
-        if fd is not None and lines_are_unfinished and self.buffer_lines:
-            self.fd_to_buffer[fd] = lines[-1]
+        # Quite a few conditions for putting stuff into the buffer
+        if (fd is not None and lines_are_unfinished and
+                self.buffer_lines and not force_finish):
+            self.fd_to_buffer[(fd, atype)] = lines[-1]
             lines = lines[:-1]
             lines_are_unfinished = False
 
