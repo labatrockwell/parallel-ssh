@@ -318,7 +318,7 @@ class Task(object):
     def report(self, n):
         """Pretty prints a status report after the Task completes."""
         error = ', '.join(self.failures)
-        tstamp = time.asctime().split()[3] # Current time
+        tstamp = time.asctime().split()[3]  # Current time
         if color.has_colors(sys.stdout):
             progress = color.c("[%s]" % color.B(n))
             success = color.g("[%s]" % color.B("SUCCESS"))
@@ -332,9 +332,11 @@ class Task(object):
             stderr = "Stderr: "
         host = self.pretty_host
         if self.failures:
-            print(' '.join((progress, tstamp, failure, host, error)))
+            msg = ' '.join((progress, tstamp, failure, host, error))
         else:
-            print(' '.join((progress, tstamp, success, host)))
+            msg = ' '.join((progress, tstamp, success, host))
+        sys.stderr.write(msg + '\n')
+        sys.stderr.flush()
         # NOTE: The extra flushes are to ensure that the data is output in
         # the correct order with the C implementation of io.
         if self.outputbuffer:
