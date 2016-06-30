@@ -68,6 +68,7 @@ class PasswordServer(object):
     def handle_write(self, fd, iomap):
         buffer = self.buffermap[fd]
         conn = self.socketmap[fd]
+        bytes_written = 0
         try:
             bytes_written = conn.send(buffer)
         except socket.error:
