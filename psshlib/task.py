@@ -20,16 +20,31 @@ except NameError:
     bytes = str
 
 
+DEFAULT_ENCODING = 'utf-8'
+OUTPUT_FORMATS = {
+    'err': '%(host)s ' + color.B(color.r('=>')) + ' %(line)s',
+    'out': '%(host)s ' + color.b(color.g('->')) + ' %(line)s',
+    '': '%(host)s ' + color.B(color.b('->')) + ' %(line)s',
+    # 'eco': '%(host)s =: %(line)s',  # exit code OK
+    # 'ece': '%(host)s =: %(line)s',  # exit code error
+}
+OUTPUT_FORMATS = {key: val.encode(DEFAULT_ENCODING) for key, val in OUTPUT_FORMATS.items()}
+UNTERMINATED_LINE_MARK = color.b(color.y('\\')).encode(DEFAULT_ENCODING)
+
+
 class Task(object):
-    """Starts a process and manages its input and output.
+    '''
+    Starts a process and manages its input and output.
 
     Upon completion, the `exitstatus` attribute is set to the exit status
     of the process.
-    """
+    '''
+
     def __init__(self, host, port, user, cmd, opts, stdin=None):
         self.exitstatus = None
 
         self.host = host
+        self.host_b = host.encode(DEFAULT_ENCODING)
         self.pretty_host = host
         self.port = port
         self.cmd = cmd
@@ -55,6 +70,12 @@ class Task(object):
         self.stderr = None
         self.outfile = None
         self.errfile = None
+        try:
+            self.outstream = sys.stdout.buffer
+            self.errstream = sys.stderr.buffer
+        except AttributeError:  # PY2
+            self.outstream = sys.stdout
+            self.errstream = sys.stderr
 
         # Set options.
         self.verbose = opts.verbose
@@ -80,7 +101,7 @@ class Task(object):
             self.inline_stdout = False
 
     def start(self, nodenum, iomap, writer, askpass_socket=None):
-        """Starts the process and registers files with the IOMap."""
+        ''' Starts the process and registers files with the IOMap. '''
         self.writer = writer
 
         if writer:
@@ -119,7 +140,7 @@ class Task(object):
         iomap.register_read(self.stderr.fileno(), self.handle_stderr)
 
     def _kill(self):
-        """Signals the process to terminate."""
+        ''' Signals the process to terminate. '''
         if self.proc:
             try:
                 os.kill(-self.proc.pid, signal.SIGKILL)
@@ -129,27 +150,27 @@ class Task(object):
             self.killed = True
 
     def timedout(self):
-        """Kills the process and registers a timeout error."""
+        ''' Kills the process and registers a timeout error. '''
         if not self.killed:
             self._kill()
             self.failures.append('Timed out')
 
     def interrupted(self):
-        """Kills the process and registers an keyboard interrupt error."""
+        ''' Kills the process and registers an keyboard interrupt error. '''
         if not self.killed:
             self._kill()
             self.failures.append('Interrupted')
 
     def cancel(self):
-        """Stops a task that has not started."""
+        ''' Stops a task that has not started. '''
         self.failures.append('Cancelled')
 
     def elapsed(self):
-        """Finds the time in seconds since the process was started."""
+        ''' Finds the time in seconds since the process was started. '''
         return time.time() - self.timestamp
 
     def running(self):
-        """Finds if the process has terminated and saves the return code."""
+        ''' Finds if the process has terminated and saves the return code. '''
         if self.stdin or self.stdout or self.stderr:
             return True
         if self.proc:
@@ -172,7 +193,7 @@ class Task(object):
                 return False
 
     def handle_stdin(self, fd, iomap):
-        """Called when the process's standard input is ready for writing."""
+        ''' Called when the process's standard input is ready for writing. '''
         try:
             start = self.byteswritten
             if start < len(self.inputbuffer):
@@ -180,11 +201,11 @@ class Task(object):
                 self.byteswritten = start + os.write(fd, chunk)
             else:
                 self.close_stdin(iomap)
-        except (OSError, IOError):
-            _, e, _ = sys.exc_info()
-            if e.errno != EINTR:
+        except (OSError, IOError) as exc:
+            ei = sys.exc_info()
+            if exc.errno != EINTR:
                 self.close_stdin(iomap)
-                self.log_exception(e)
+                self.log_exception(exc, ei=ei)
 
     def close_stdin(self, iomap):
         if self.stdin:
@@ -193,7 +214,7 @@ class Task(object):
             self.stdin = None
 
     def handle_stdout(self, fd, iomap):
-        """Called when the process's standard output is ready for reading."""
+        ''' Called when the process's standard output is ready for reading. '''
         try:
             buf = os.read(fd, BUFFER_SIZE)
             if buf:
@@ -205,19 +226,19 @@ class Task(object):
                     if self.annotate_lines:
                         self.print_annotated_lines(buf, fd=fd)
                     else:
-                        sys.stdout.write('%s: %s' % (self.host, buf))
+                        self.outstream.write(b'%s: %s' % (self.host, buf))
                         if buf[-1] != '\n':
-                            sys.stdout.write('\n')
+                            self.outstream.write(b'\n')
             else:
                 if self.annotate_lines:
                     # Flush the remaining buffer
-                    self.print_annotated_lines('', fd=fd, force_finish=True)
+                    self.print_annotated_lines(b'', fd=fd, force_finish=True)
                 self.close_stdout(iomap)
-        except (OSError, IOError):
-            _, e, _ = sys.exc_info()
-            if e.errno != EINTR:
+        except (OSError, IOError) as exc:
+            ei = sys.exc_info()
+            if exc.errno != EINTR:
                 self.close_stdout(iomap)
-                self.log_exception(e)
+                self.log_exception(exc)
 
     def close_stdout(self, iomap):
         if self.stdout:
@@ -229,7 +250,7 @@ class Task(object):
             self.outfile = None
 
     def handle_stderr(self, fd, iomap):
-        """Called when the process's standard error is ready for reading."""
+        ''' Called when the process's standard error is ready for reading. '''
         try:
             buf = os.read(fd, BUFFER_SIZE)
             if buf:
@@ -245,11 +266,11 @@ class Task(object):
                     # Flush the remaining buffer
                     self.print_annotated_lines('', fd=fd, atype='err', force_finish=True)
                 self.close_stderr(iomap)
-        except (OSError, IOError):
-            _, e, _ = sys.exc_info()
-            if e.errno != EINTR:
-                self.close_stderr(iomap)
-                self.log_exception(e)
+        except (OSError, IOError) as exc:
+            ei = sys.exc_info()
+            if exc.errno != EINTR:
+                self.close_stdin(iomap)
+                self.log_exception(exc, ei=ei)
 
     def close_stderr(self, iomap):
         if self.stderr:
@@ -267,7 +288,7 @@ class Task(object):
             if buf_pre:
                 buf = buf_pre + buf
 
-        lines_are_unfinished = buf and (buf[-1] != '\n')
+        lines_are_unfinished = buf and (buf[-1:] != b'\n')
         lines = buf.splitlines()  # .split('\n')
 
         # Quite a few conditions for putting stuff into the buffer
@@ -281,45 +302,41 @@ class Task(object):
             return ''
 
         outs = []
-        formats = {
-            'err': '%(host)s ' + color.B(color.r('=>')) + ' %(line)s',
-            'out': '%(host)s ' + color.b(color.g('->')) + ' %(line)s',
-            '': '%(host)s ' + color.B(color.b('->')) + ' %(line)s',
-            # 'eco': '%(host)s =: %(line)s',  # exit code OK
-            # 'ece': '%(host)s =: %(line)s',  # exit code error
-        }
-        sformat = formats.get(atype) or formats['']
-        for i, line in enumerate(lines):
-            outline = sformat % dict(line=line, host=self.host)
-            if i == len(lines) - 1:  # last line
+        sformat = OUTPUT_FORMATS.get(atype) or OUTPUT_FORMATS['']
+        for idx, line in enumerate(lines):
+            outline = sformat % {b'line': line, b'host': self.host_b}
+            if idx == len(lines) - 1:  # last line
                 if lines_are_unfinished:
                     # Sort-of-disambiguate
-                    outline = outline + color.b(color.y('\\'))
+                    outline = outline + UNTERMINATED_LINE_MARK
             outs.append(outline)
-        out = '\n'.join(outs) + '\n'
+        out = b'\n'.join(outs) + b'\n'
         if atype == 'err':
-            outbuf = sys.stderr
+            outbuf = self.errstream
         else:
-            outbuf = sys.stdout
+            outbuf = self.outstream
         outbuf.write(out)
         outbuf.flush()
         return out
 
-    def log_exception(self, e):
-        """Saves a record of the most recent exception for error reporting."""
+    def log_exception(self, exc, ei=None):
+        ''' Saves a record of the most recent exception for error reporting. '''
         if self.verbose:
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            exc = ("Exception: %s, %s, %s" %
-                   (exc_type, exc_value, traceback.format_tb(exc_traceback)))
+            if ei is None:
+                ei = sys.exc_info()
+            exc_type, exc_value, exc_traceback = ei
+            exc = (
+                'Exception: %s, %s, %s' %
+                (exc_type, exc_value, traceback.format_tb(exc_traceback)))
         else:
-            exc = str(e)
+            exc = str(exc)
         self.failures.append(exc)
 
     def report(self, n):
         """Pretty prints a status report after the Task completes."""
         error = ', '.join(self.failures)
         tstamp = time.asctime().split()[3]  # Current time
-        if color.has_colors(sys.stdout):
+        if color.has_colors(self.outstream):
             progress = color.c("[%s]" % color.B(n))
             success = color.g("[%s]" % color.B("SUCCESS"))
             failure = color.r("[%s]" % color.B("FAILURE"))
@@ -335,23 +352,16 @@ class Task(object):
             msg = ' '.join((progress, tstamp, failure, host, error))
         else:
             msg = ' '.join((progress, tstamp, success, host))
-        sys.stderr.write(msg + '\n')
-        sys.stderr.flush()
+        self.errstream.write(msg.encode(DEFAULT_ENCODING) + b'\n')
+        self.errstream.flush()
         # NOTE: The extra flushes are to ensure that the data is output in
         # the correct order with the C implementation of io.
         if self.outputbuffer:
-            sys.stdout.flush()
-            try:
-                sys.stdout.buffer.write(self.outputbuffer)
-                sys.stdout.flush()
-            except AttributeError:
-                sys.stdout.write(self.outputbuffer)
+            self.outstream.flush()
+            self.outstream.write(self.outputbuffer)
+            self.outstream.flush()
         if self.errorbuffer:
-            sys.stdout.write(stderr)
+            self.outstream.write(stderr)
             # Flush the TextIOWrapper before writing to the binary buffer.
-            sys.stdout.flush()
-            try:
-                sys.stdout.buffer.write(self.errorbuffer)
-            except AttributeError:
-                sys.stdout.write(self.errorbuffer)
-
+            self.outstream.flush()
+            self.outstream.write(self.errorbuffer)
