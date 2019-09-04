@@ -120,5 +120,5 @@ if __name__ == "__main__":
         sys.exit(1)
     if opts.host_strings:
         for s in opts.host_strings:
-            hosts.extend(psshutil.parse_host_string(s, default_user=opts.user))
+            hosts.extend(psshutil.parse_host_string(s, default_user=opts.user, all_addresses=opts.all_addresses))
     do_pssh(hosts, cmdline, opts)
