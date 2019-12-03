@@ -223,10 +223,11 @@ class Task(object):
                 if self.outfile:
                     self.writer.write(self.outfile, buf)
                 if self.print_out:
-                    if self.annotate_lines:
+                    if True:
                         self.print_annotated_lines(buf, fd=fd)
-                    else:
-                        self.outstream.write(b'%s: %s' % (self.host, buf))
+                    else:  # This is nearly uselss because it intermixes the hosts' data.
+                        # self.outstream.write(b'%s: %s' % (self.host, buf))
+                        self.outstream.write(buf)
                         if buf[-1] != '\n':
                             self.outstream.write(b'\n')
             else:
@@ -304,7 +305,10 @@ class Task(object):
         outs = []
         sformat = OUTPUT_FORMATS.get(atype) or OUTPUT_FORMATS['']
         for idx, line in enumerate(lines):
-            outline = sformat % {b'line': line, b'host': self.host_b}
+            if self.annotate_lines:
+                outline = sformat % {b'line': line, b'host': self.host_b}
+            else:
+                outline = line
             if idx == len(lines) - 1:  # last line
                 if lines_are_unfinished:
                     # Sort-of-disambiguate
