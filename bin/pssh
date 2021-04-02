@@ -42,6 +42,12 @@ def option_parser():
             help='read from standard input and send as input to ssh')
     parser.add_option('-P', '--print', dest='print_out', action='store_true',
             help='print output as we get it')
+    parser.add_option('--no-annotate-each-line',
+            dest='no_annotate_lines', action='store_true',
+            help="Don't prefix each line of the `-P`rinted output with the host info")
+    parser.add_option('--no-buffer-each-line',
+            dest='no_buffer_lines', action='store_true',
+            help="Don't use line-buffering i.e. allow breaking the lines")
 
     return parser
 
@@ -114,5 +120,5 @@ if __name__ == "__main__":
         sys.exit(1)
     if opts.host_strings:
         for s in opts.host_strings:
-            hosts.extend(psshutil.parse_host_string(s, default_user=opts.user))
+            hosts.extend(psshutil.parse_host_string(s, default_user=opts.user, all_addresses=opts.all_addresses))
     do_pssh(hosts, cmdline, opts)

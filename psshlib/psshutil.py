@@ -2,6 +2,7 @@
 # Copyright (c) 2003-2008, Brent N. Chun
 
 import fcntl
+import socket
 import string
 import sys
 
@@ -72,8 +73,9 @@ def parse_host_entry(line, default_user, default_port):
     return host, port, user
 
 
-def parse_host_string(host_string, default_user=None, default_port=None):
-    """Parses a whitespace-delimited string of "[user@]host[:port]" entries.
+def parse_host_string(host_string, default_user=None, default_port=None, all_addresses=False):
+    """
+    Parses a whitespace-delimited string of "[user@]host[:port]" entries.
 
     Returns a list of (host, port, user) triples.
     """
@@ -81,6 +83,12 @@ def parse_host_string(host_string, default_user=None, default_port=None):
     entries = host_string.split()
     for entry in entries:
         hosts.append(parse_host(entry, default_user, default_port))
+    if all_addresses:
+        hosts_full = []
+        for host, port, user in hosts:
+            for host_address in get_host_addresses(host, port=port):
+                hosts_full.append((host_address, port, user))
+        hosts = hosts_full
     return hosts
 
 
@@ -99,8 +107,25 @@ def parse_host(host, default_user=None, default_port=None):
     return (host, port, user)
 
 
+def get_host_addresses(host, port=0, **kwargs):
+    results = socket.getaddrinfo(
+        host,
+        port,
+        # family=
+        socket.AF_UNSPEC,
+        # type=
+        socket.SOCK_STREAM,
+        # proto=
+        socket.IPPROTO_TCP,
+        # flags=
+        socket.AI_ADDRCONFIG,
+    )
+    return [item[4][0] for item in results]
+
+
 def set_cloexec(filelike):
-    """Sets the underlying filedescriptor to automatically close on exec.
+    """
+    Sets the underlying filedescriptor to automatically close on exec.
 
     If set_cloexec is called for all open files, then subprocess.Popen does
     not require the close_fds option.
